@@ -1,6 +1,7 @@
 ﻿#include "pch.h"
 #include "ShaderLabMain.h"
 #include "Common\DirectXHelper.h"
+#include <imgui/backends/imgui_impl_dx11.h>
 
 using namespace ShaderLab;
 using namespace Windows::Foundation;
@@ -15,18 +16,51 @@ ShaderLabMain::ShaderLabMain(const std::shared_ptr<DX::DeviceResources>& deviceR
 	m_deviceResources->RegisterDeviceNotify(this);
 
 	// TODO: Replace this with your app's content initialization.
-	m_sceneRenderer = std::unique_ptr<Sample3DSceneRenderer>(new Sample3DSceneRenderer(m_deviceResources));
+	m_sceneRenderer = std::unique_ptr<SceneRenderer>(new SceneRenderer(m_deviceResources));
 
 	m_fpsTextRenderer = std::unique_ptr<SampleFpsTextRenderer>(new SampleFpsTextRenderer(m_deviceResources));
 
 	m_timer.SetFixedTimeStep(true);
 	m_timer.SetTargetElapsedSeconds(1.0 / 60);
 
+	// Setup Dear ImGui context
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;       // Enable Keyboard Controls
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
+	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
+	//io.ConfigViewportsNoAutoMerge = true;
+	//io.ConfigViewportsNoTaskBarIcon = true;
+	//io.ConfigViewportsNoDefaultParent = true;
+	//io.ConfigDockingAlwaysTabBar = true;
+	//io.ConfigDockingTransparentPayload = true;
+	//io.ConfigFlags |= ImGuiConfigFlags_DpiEnableScaleFonts;     // FIXME-DPI: Experimental. THIS CURRENTLY DOESN'T WORK AS EXPECTED. DON'T USE IN USER APP!
+	//io.ConfigFlags |= ImGuiConfigFlags_DpiEnableScaleViewports; // FIXME-DPI: Experimental.
+
+	// Setup Dear ImGui style
+	ImGui::StyleColorsDark();
+	//ImGui::StyleColorsClassic();
+
+	// When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
+	ImGuiStyle& style = ImGui::GetStyle();
+	if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+	{
+		style.WindowRounding = 0.0f;
+		style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+	}
+
+	// Setup Platform/Renderer backends
+	ImGui_ImplDX11_Init(deviceResources->GetD3DDevice(),deviceResources->GetD3DDeviceContext());
+
 }
 
 ShaderLabMain::~ShaderLabMain()
 {
 	// Deregister device notification
+	ImGui_ImplDX11_Shutdown();
+	ImGui::DestroyContext();
 	m_deviceResources->RegisterDeviceNotify(nullptr);
 }
 
@@ -45,6 +79,9 @@ void ShaderLabMain::Update()
 	{
 		// TODO: Replace this with your app's content update functions.
 		m_sceneRenderer->Update(m_timer);
+		ImGui::NewFrame();
+		if (m_show_demo_window)
+			ImGui::ShowDemoWindow(&m_show_demo_window);
 		m_fpsTextRenderer->Update(m_timer);
 	});
 }
@@ -74,8 +111,8 @@ bool ShaderLabMain::Render()
 	context->ClearDepthStencilView(m_deviceResources->GetDepthStencilView(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
 	// Render the scene objects.
-	// TODO: Replace this with your app's content rendering functions.
 	m_sceneRenderer->Render();
+	ImGui::Render();
 	m_fpsTextRenderer->Render();
 
 	return true;
@@ -85,6 +122,8 @@ bool ShaderLabMain::Render()
 void ShaderLabMain::OnDeviceLost()
 {
 	m_sceneRenderer->ReleaseDeviceDependentResources();
+	ImGui_ImplDX11_Shutdown();
+	ImGui::DestroyContext();
 	m_fpsTextRenderer->ReleaseDeviceDependentResources();
 }
 
